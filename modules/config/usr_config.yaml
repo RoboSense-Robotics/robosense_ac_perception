@@ -1,0 +1,61 @@
+
+yolov8_node:
+  sub_image_topic: /rs_camera/rgb
+  pub_object_topic: yolov8_object
+  yolov8:
+    strategy: Yolov8DetNN
+    Yolov8DetNN:
+      sub_image_topic: /rs_camera/rgb
+      arm_model: "modules/config/deepmodel/Yolov8/yolov8n.rknn"
+      x86_model: "modules/config/deepmodel/Yolov8/yolov8n.trt"
+      nms_threshold: 0.45
+      box_conf_threshold: 0.5
+      nn_input_width: 640
+      nn_input_height: 640
+      save_img: false
+
+pv_post_process_app:
+  calib_file: "modules/config/calibration.yaml"
+  sub_image_topic: /rs_camera/rgb
+  sub_lidar_topic: /rs_lidar/points
+  sub_object_topic: yolov8_object
+  pub_object_topic: pv_post_process_object
+  ground_height: -1.5
+  sensor_pitch: 2.5
+  use_cover_mask: false # true for delete ped cover
+  debug_image: false
+  debug_lidar: false
+
+ppseg_node:
+  sub_image_topic: /rs_camera/rgb
+  pub_object_topic: ppseg
+  ppseg:
+    strategy: PPSegNN
+    PPSegNN:
+      sub_image_topic: /rs_camera/rgb
+      calib_file: "modules/config/calibration.yaml"
+      arm_model: "modules/config/deepmodel/PPSeg/ppseg_fp16.rknn"
+      x86_model: "modules/config/deepmodel/PPSeg/ppseg_fp16.trt"
+      nn_input_width: 1792
+      nn_input_height: 1024
+      save_img: false
+
+promptda_node:
+  sub_image_topic: /rs_camera/rgb
+  sub_lidar_topic: /rs_lidar/points
+  pub_object_topic: promptda
+  time_diff_thresh: 20
+  promptda:
+    strategy: PromptDANN
+    PromptDANN:
+      sub_image_topic: /rs_camera/rgb
+      calib_file: "modules/config/calibration.yaml"
+      arm_model_s1: "modules/config/deepmodel/PromptDA/promptda_lidar.rknn"
+      arm_model_s2: "modules/config/deepmodel/PromptDA/promptda_image.rknn"
+      x86_model: "modules/config/deepmodel/PromptDA/promptda_fp16.trt"
+      nn_input_width: 952
+      nn_input_height: 420
+      core: 0
+      clip_min: 2.1
+      clip_max: 3.8
+      save_img: false
