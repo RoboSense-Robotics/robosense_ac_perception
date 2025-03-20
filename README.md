@@ -23,7 +23,7 @@ Create a new folder or enter your existing `ros2` workspace, and execute the fol
 
 ```bash
 cd WORKSPACE_PATH
-mkdir super_sensor_sdk_ros2 && cd super_sensor_sdk_ros2
+mkdir ac_studio && cd ac_studio
 # http
 git clone https://github.com/RoboSense-Robotics/robosense_ac_perception.git -b main
 ```
@@ -40,7 +40,7 @@ bash download_model.sh
 Use the `rosdep` tool to install the dependencies required for compiling `robosense_ac_perception`.
 
 ```bash
-cd super_sensor_sdk_ros2
+cd ac_studio
 rosdep install --from-paths robosense_ac_perception --ignore-src -r -y
 ```
 
