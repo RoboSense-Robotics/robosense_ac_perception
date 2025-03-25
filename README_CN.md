@@ -74,7 +74,7 @@ source install/setup.bash
 可以连接超级传感器在线获取数据，或者离线播放数据包进行测试。
 #### 4.1.1 运行超级传感器
 
-参考 [文档](https://github.com/RoboSense-Robotics/robosense_ac_ros2_sdk_infra/tree/main/modules/ros_metas) 运行超级传感器节点，实时获取数据
+参考 [文档](https://github.com/RoboSense-Robotics/robosense_ac_ros2_sdk_infra/tree/main/modules/ac_driver) 运行超级传感器节点，实时获取数据
 
 #### 4.1.2 离线播放数据
 使用 `ros2 bag` 命令播放数据包，例如：

@@ -75,7 +75,7 @@ source install/setup.bash
 Data can be obtained either by connecting to a Super Sensor online or by playing offline data packets for testing.
 #### 4.1.1 Running the Super Sensor
 
-Refer to the [documentation](https://github.com/RoboSense-Robotics/robosense_ac_ros2_sdk_infra/tree/main/modules/ros_metas) to run the Super Sensor node for real-time data acquisition.
+Refer to the [documentation](https://github.com/RoboSense-Robotics/robosense_ac_ros2_sdk_infra/tree/main/modules/ac_driver) to run the Super Sensor node for real-time data acquisition.
 
 #### 4.1.2 Offline Data Playback
 Use the `ros2 bag` command to play back data packets, for example:
