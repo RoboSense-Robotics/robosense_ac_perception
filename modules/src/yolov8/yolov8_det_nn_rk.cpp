@@ -157,11 +157,11 @@ void Yolov8DetNN::Perception(const DetectionMsg::Ptr &msg_ptr) {
 
   postprocess_time_record_.tic();
   PostProcess();
-  postprocess_time_record_.toc();
-
   // save
   DrawImg(msg_ptr, msg_ptr->input_msg_ptr->camera_data_map.at(topic), params_ptr_->msg_ptr_->od_results);
   DetectResultToObjectInner(params_ptr_->msg_ptr_->od_results,msg_ptr->input_msg_ptr->camera_data_map.at(topic).timestamp, msg_ptr->output_msg_ptr->object_list_ptr);
+  postprocess_time_record_.toc();
+
 }
 
 void Yolov8DetNN::PostProcess() {

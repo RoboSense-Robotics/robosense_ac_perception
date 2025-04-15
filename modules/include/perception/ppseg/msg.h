@@ -19,6 +19,7 @@ limitations under the License.
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #ifdef ENABLE_TENSORRT
 #include "NvInfer.h"
@@ -39,12 +40,18 @@ public:
       cudaFree(x);
     }
 #endif
+#ifdef ENABLE_RKNN
     for (auto x : inputs) {
-      free(x);
+      if (x != nullptr) {
+        free(x);
+      }
     }
     for (auto& x : nn_outputs) {
-      free(x);
+      if (x != nullptr) {
+        free(x);
+      }
     }
+#endif
   }
 #ifdef ENABLE_TENSORRT
   std::vector<void*> gpu_inputs;

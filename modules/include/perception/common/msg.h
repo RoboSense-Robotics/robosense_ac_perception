@@ -18,13 +18,21 @@ limitations under the License.
 
 #include "perception/common/input_msg.h"
 #include "perception/common/output_msg.h"
-
+#if defined(USE_ROS1)
+#include <std_msgs/Header.h>
+#elif defined(USE_ROS2)
+#include <std_msgs/msg/header.hpp>
+#endif
 namespace robosense {
 namespace perception {
 
 struct DetectionMsg {
   using Ptr = std::shared_ptr<DetectionMsg>;
-
+#if defined(USE_ROS1)
+  std_msgs::Header header;
+#elif defined(USE_ROS2)
+  std_msgs::msg::Header header;
+#endif
   DetectionInputMsg::Ptr input_msg_ptr;
   DetectionOutputMsg::Ptr output_msg_ptr;
 };

@@ -52,6 +52,7 @@ private:
   PPSegParams::Ptr params_ptr_;
 
   TrtLogger trt_logger_;
+  std::unique_ptr<nvinfer1::IRuntime> runtime_;
   std::shared_ptr<nvinfer1::ICudaEngine> engine_;
   std::shared_ptr<nvinfer1::IExecutionContext> context_;
   cudaStream_t stream_;

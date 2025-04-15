@@ -23,6 +23,7 @@ limitations under the License.
 #include "perception/promptda/inner_type.h"
 #include "perception/promptda/preprocess.h"
 #include "perception/promptda/postprocess.h"
+#include <cuda.h>  // for CUDA_VERSION
 #include "NvInfer.h"
 
 namespace robosense {
@@ -68,6 +69,7 @@ private:
   int knn_pooling_scale_, knn_k_;
 
   TrtLogger trt_logger_;
+  std::unique_ptr<nvinfer1::IRuntime> runtime_;
   std::shared_ptr<nvinfer1::ICudaEngine> engine_;
   std::shared_ptr<nvinfer1::IExecutionContext> context_;
   cudaStream_t stream_;

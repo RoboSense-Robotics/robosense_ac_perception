@@ -31,11 +31,24 @@ void PPSegConfig::Init(const YAML::Node &cfg_node) {
         std::cout << "current work dir is: " << buffer << std::endl;
     }
 #ifdef __aarch64__
-    rally::yamlRead(cfg_node, "arm_model", model_path);
+#ifdef ENABLE_RKNN
+    rally::yamlRead(cfg_node, "arm_rknn_model", model_path);
+#endif
+#ifdef ENABLE_HBDNN
+    rally::yamlRead(cfg_node, "arm_hbdnn_model", model_path);
+#endif
+#ifdef ENABLE_TENSORRT
+    rally::yamlRead(cfg_node, "arm_trt_model", model_path);
+#endif
 #else // x86
     rally::yamlRead(cfg_node, "x86_model", model_path);
 #endif
+
+#if defined(USE_ROS1)
+    model_path = std::string(PROJECT_PATH) + "/../" + model_path;
+#elif defined(USE_ROS2)
     model_path = std::string(buffer) + "/" + model_path;
+#endif
     std::ifstream ifs(model_path);
     if (!ifs.is_open()) {
         std::cout << "model path error!" << std::endl;
@@ -44,7 +57,11 @@ void PPSegConfig::Init(const YAML::Node &cfg_node) {
         ifs.close();
     }
     rally::yamlRead(cfg_node, "calib_file", calib_file);
+#if defined(USE_ROS1)
+    calib_file = std::string(PROJECT_PATH) + "/../" + calib_file;
+#elif defined(USE_ROS2)
     calib_file = std::string(buffer) + "/" + calib_file;
+#endif
     std::ifstream ifs_calib(calib_file);
     if (!ifs_calib.is_open()) {
         std::cout << "calib file path error!" << std::endl;

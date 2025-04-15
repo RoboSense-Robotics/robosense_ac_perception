@@ -14,10 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ************************************************************************/
 #include "perception/pv_post_process/pv_post_process.hpp"
+#include <unistd.h>  // Linux/macOS
 
 namespace robosense {
 namespace perception {
 bool PvPostProcess::Init(const YAML::Node& config) {
+  char buffer[256];
+  if (getcwd(buffer, sizeof(buffer)) != nullptr) {
+      std::cout << "current work dir is: " << buffer << std::endl;
+  }
   std::string calib_file;
   if (rally::yamlRead(config, "calib_file", calib_file)) {
     std::cout << " calib_file: " << calib_file << std::endl;
@@ -25,6 +30,11 @@ bool PvPostProcess::Init(const YAML::Node& config) {
     std::cout << " please set calib_file in yaml file! ";
     return false;
   }
+#if defined(USE_ROS1)
+    calib_file = std::string(PROJECT_PATH) + "/../" + calib_file;
+#elif defined(USE_ROS2)
+    calib_file = std::string(buffer) + "/" + calib_file;
+#endif
   SetCalibration(calib_file);
   mask_image_ = cv::Mat::zeros(image_height_, image_width_, CV_8UC1);
   rally::yamlRead(config, "debug_image", debug_image_);

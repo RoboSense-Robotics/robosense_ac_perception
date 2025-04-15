@@ -1,0 +1,14 @@
+<launch>
+	<arg name="rviz" default="true" />
+
+	<rosparam command="load" file="$(find robosense_ac_perception)/config/usr_config.yaml" />
+
+	<node pkg="robosense_ac_perception" type="promptda_node" name="promptda_node" output="screen" args="--config $(find robosense_ac_perception)/config/usr_config.yaml" cwd="node">
+		<rosparam file="$(find robosense_ac_perception)/config/usr_config.yaml" />
+	</node>
+
+	<group if="$(arg rviz)">
+		<node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find robosense_ac_perception)/rviz_config/rviz_config_promptda.rviz" />
+	</group>
+</launch>
+

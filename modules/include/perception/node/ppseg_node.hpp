@@ -16,18 +16,21 @@ limitations under the License.
 #ifndef PERCEPTION_NODE_PPSEG_NODE_H
 #define PERCEPTION_NODE_PPSEG_NODE_H
 
+#include <thread>
+#include <perception/common/queue.h>
+#include <perception/node/ros_dep.h>
 #include "perception/interface.h"
-#ifdef ENABLE_TENSORRT
+#if defined(ENABLE_TENSORRT)
 #include "perception/ppseg/ppseg_nn_trt.h"
-#endif
-#ifdef ENABLE_RKNN
+#elif defined(ENABLE_RKNN)
 #include "perception/ppseg/ppseg_nn_rk.h"
+#elif defined(ENABLE_HBDNN)
+#include "perception/ppseg/ppseg_nn_hbdnn.h"
 #endif
-#include "rclcpp/rclcpp.hpp"
-#include <opencv2/opencv.hpp>
-#include <sensor_msgs/msg/image.hpp>
 #include <cv_bridge/cv_bridge.h>
+
 namespace robosense {
+namespace perception {
 
 struct PPSegNodeOptions {
   std::string sub_image_topic;
@@ -38,53 +41,46 @@ struct PPSegNodeOptions {
   }
 };
 
-class PPSegNode : public rclcpp::Node {
+class PPSegNode {
 public:
-  PPSegNode(const PPSegNodeOptions& options) : rclcpp::Node("ppseg_node") {
-    options_ = options;
-    // Subscribe to the image topic
-    subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
-        options_.sub_image_topic, 10, std::bind(&PPSegNode::ImageCallback, this, std::placeholders::_1));
-
-    perception::PerceptionInterfaceOptions seg_options;
-    seg_options.Load(options_.ppseg_cfg_node);
-    seg_ptr_.reset(new perception::PerceptionInterface(seg_options));
-
-    // pub
-    publisher_ = this->create_publisher<sensor_msgs::msg::Image>("ppseg", 10);
+  PPSegNode(const PPSegNodeOptions& options);
+  ~PPSegNode() {
+    Stop();
   }
 
+#if defined(USE_ROS2)
+  rclcpp::Node::SharedPtr GetRos2Node() {
+    return ros2_node_ptr_;
+  }
+#endif
 private:
-  void ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
-    try {
-      // Convert ROS image message to OpenCV format
-      // cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::RGB8);
-      // const auto& image = cv_ptr->image;
-      cv::Mat image(cv::Size(msg->width, msg->height), CV_8UC3, reinterpret_cast<void*>(const_cast<unsigned char*>(msg->data.data())));
-      perception::DetectionMsg::Ptr msg_ptr(new perception::DetectionMsg);
-      msg_ptr->input_msg_ptr.reset(new perception::DetectionInputMsg);
-      msg_ptr->output_msg_ptr.reset(new perception::DetectionOutputMsg);
-      msg_ptr->output_msg_ptr->object_list_ptr.reset(new perception::ObjectInnerArray);
-      perception::Image tmp_image;
-      tmp_image.timestamp = uint64_t(msg->header.stamp.sec * 1e9 + msg->header.stamp.nanosec);
-      tmp_image.mat = image;
-      msg_ptr->input_msg_ptr->camera_data_map[options_.sub_image_topic] = tmp_image;
-
-      seg_ptr_->Process(msg_ptr);
-      auto out_msg_ptr = cv_bridge::CvImage(msg->header, "bgr8", msg_ptr->output_msg_ptr->mat).toImageMsg();
-      publisher_->publish(*out_msg_ptr);
-    } catch (std::exception &e) {
-      std::cout << e.what();
-    }
+  void Start();
+  void Stop();
+  void Core();
+  bool run_flag_ = false;
+  std::unique_ptr<std::thread> thread_ptr_;
+  SyncQueue<perception::DetectionMsg::Ptr> msg_queue_{10};
+  std::string Name() {
+    return "PPSegNode";
   }
-
+  void ImageCallback(const ImageMsgsConstPtr msg);
+#if defined(USE_ROS1)
+  ros::NodeHandle nh_;
+  ros::Subscriber subscription_;
+  ros::Publisher publisher_;
+#elif defined(USE_ROS2)
+  bool zero_copy_ = false;
+  void ZCImageCallback(const robosense_msgs::msg::RsImage::Ptr msg);
+  rclcpp::Node::SharedPtr ros2_node_ptr_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
+  rclcpp::Subscription<robosense_msgs::msg::RsImage>::SharedPtr subscription_zc_;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher_;
-
+#endif
   PPSegNodeOptions options_;
   perception::PerceptionInterface::Ptr seg_ptr_;
 };
 
-}  // namespace robosense
+} // namespace perception
+} // namespace robosense
 
 #endif  // PERCEPTION_NODE_PPSEG_NODE_H

@@ -16,18 +16,18 @@ target_include_directories(${CUR_LIB}
         PUBLIC
         ${CUR_INCLUDES}
         ${OpenCV_INCLUDE_DIRS}
+        ${PCL_INCLUDE_DIRS}
+        ${pcl_conversions_INCLUDE_DIRS}
         ${YAML_CPP_INCLUDE_DIRS}
         ${EIGEN3_INCLUDE_DIR}
 )
 
 target_link_libraries(${CUR_LIB}
         ${OpenCV_LIBS}
+        ${PCL_LIBRARIES}
+        ${pcl_conversions_LIBRARIES}
         ${YAML_CPP_LIBRARIES}
-        )
-ament_target_dependencies(${CUR_LIB}
-        PCL
-        pcl_conversions
-      )
+)
 #=============================
 # install
 #=============================

@@ -51,8 +51,8 @@ bool PromptDANN::LoadEngine(const std::string& engineFile) {
   file.read(buffer.data(), fileSize);
   file.close();
 
-  auto runtime = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(trt_logger_));
-  engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(buffer.data(), fileSize));
+  runtime_ = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(trt_logger_));
+  engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(runtime_->deserializeCudaEngine(buffer.data(), fileSize));
 
   if (!engine_) {
       return false;
@@ -134,7 +134,11 @@ void PromptDANN::InitInfer() {
     context_->enqueueV3(stream_);
     auto ret = cudaStreamEndCapture(stream_, &graph_);
     if (ret == cudaSuccess) {
+#if CUDA_VERSION < 12010
       BASE_CUDA_CHECK(cudaGraphInstantiate(&graph_exec_, graph_, NULL, NULL, 0));
+#else
+      BASE_CUDA_CHECK(cudaGraphInstantiate(&graph_exec_, graph_, 0));
+#endif
       BASE_CUDA_CHECK(cudaGraphDestroy(graph_));
     } else {
       std::cout << "Failed to capture cuda graph." << std::endl;
@@ -160,7 +164,7 @@ void PromptDANN::InitMem() {
       num_output ++;
     }
   }
-  infer_msg->inputs.resize(num_input);
+  infer_msg->gpu_inputs.resize(num_input);
   model_attr->n_output = num_output;
   infer_msg->gpu_outputs.resize(num_output);
   infer_msg->nn_outputs.resize(num_output);
@@ -175,14 +179,10 @@ void PromptDANN::InitMem() {
       for (auto j=0; j<dims.nbDims; j++) {
         size *= dims.d[j];
       }
-      std::stringstream ss;
-      for (int j=0; j<dims.nbDims; j++) {
-        ss << dims.d[j] << " ";
-      }
-      std::cout << "input name: " << name << " dims: " << ss.str() << std::endl;
+      DumpTensorAttr(name, dims, data_size);
       CheckNNAttr(dims);
-      BASE_CUDA_CHECK(cudaMalloc(&infer_msg->inputs[i], size));
-      context_->setTensorAddress(name, infer_msg->inputs[i]);
+      BASE_CUDA_CHECK(cudaMalloc(&infer_msg->gpu_inputs[i], size));
+      context_->setTensorAddress(name, infer_msg->gpu_inputs[i]);
     } else {
       auto dims = context_->getTensorShape(name);
       auto data_size = dataTypeSize(engine_->getTensorDataType(name));
@@ -193,11 +193,7 @@ void PromptDANN::InitMem() {
         out_tensor_attr.setDims(j, dims.d[j]);
         out_tensor_attr.setSize(size);
       }
-      std::stringstream ss;
-      for (int j=0; j<dims.nbDims; j++) {
-        ss << dims.d[j] << " ";
-      }
-      std::cout << "output name: " << name << " dims: " << ss.str() << std::endl;
+      DumpTensorAttr(name, dims, data_size);
       model_attr->output_attrs.push_back(out_tensor_attr);
       int output_index = i - num_input;
       infer_msg->nn_outputs[output_index] = malloc(size);
@@ -249,7 +245,11 @@ void PromptDANN::PreProcess(const Image &image, const PointCloud::Ptr cloud_ptr)
   image_preprocess_time_record_.toc();
   lidar_preprocess_time_record_.tic();
   project_lidar_time_record_.tic();
+#if __aarch64__
+  cv::Mat pc_img = ProjectLidar(cloud_ptr, lidar2cam_, lidar_project_k_);
+#else
   cv::Mat pc_img = ProjectLidarOptimized(cloud_ptr, lidar2cam_, lidar_project_k_);
+#endif
   project_lidar_time_record_.toc();
   sparse_time_record_.tic();
   cv::Mat sparse_depth = cv::Mat::zeros(lidar_h_, lidar_w_, CV_32F);
@@ -264,7 +264,11 @@ void PromptDANN::PreProcess(const Image &image, const PointCloud::Ptr cloud_ptr)
 
   // 低像素深度图 KNN 补全
   knn_pooling_time_record_.tic();
+#if __aarch64__
+  cv::Mat dense_depth = KnnPooling(sparse_depth, knn_pooling_scale_, knn_k_);
+#else
   cv::Mat dense_depth = KnnPoolingOptimized(sparse_depth, knn_pooling_scale_, knn_k_);
+#endif
   knn_pooling_time_record_.toc();
   lidar_preprocess_time_record_.toc();
 
@@ -286,9 +290,9 @@ void PromptDANN::Perception(const DetectionMsg::Ptr &msg_ptr) {
   preprocess_time_record_.toc();
 
   infer_time_record_.tic();
-  BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->inputs[0], image_blob_.data,
+  BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->gpu_inputs[0], image_blob_.data,
     image_blob_.total() * sizeof(float), cudaMemcpyHostToDevice, stream_));
-  BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->inputs[1], depth_blob_.data,
+  BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->gpu_inputs[1], depth_blob_.data,
     depth_blob_.total() * sizeof(float), cudaMemcpyHostToDevice, stream_));
 
 
@@ -335,7 +339,7 @@ void PromptDANN::PostProcess(const DetectionMsg::Ptr &msg_ptr, const Image& imag
   cv::cvtColor(rgb_depth, rgb_depth, cv::COLOR_RGB2BGR);
   msg_ptr->output_msg_ptr->mat = rgb_depth;
   if (params_ptr_->config_ptr_->save_img) {
-    std::string save_path = "./results2/" +  std::to_string(timestamp) + "_depth.jpg";
+    std::string save_path = "./results/" +  std::to_string(timestamp) + "_depth.jpg";
     cv::imwrite(save_path, rgb_depth);
   }
 }

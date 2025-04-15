@@ -41,7 +41,16 @@ inline size_t dataTypeSize(nvinfer1::DataType dataType) {
     }
     return 0;
   }
-
+inline void DumpTensorAttr(const std::string& name, nvinfer1::Dims dims, size_t size) {
+  std::cout << "Tensor Name: " << name << " Dims: ";
+  std::stringstream ss;
+  for (int i = 0; i < dims.nbDims-1; ++i) {
+    ss << dims.d[i] << "x";
+  }
+  ss << dims.d[dims.nbDims-1];
+  std::cout << ss.str();
+  std::cout << " data elem size: " << size << std::endl;
+}
   #define BASE_CUDA_CHECK(condition) \
     { GPUAssert((condition), __FILE__, __LINE__); }
 

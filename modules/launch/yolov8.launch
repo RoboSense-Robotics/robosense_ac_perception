@@ -1,0 +1,16 @@
+<launch>
+	<arg name="rviz" default="true" />
+
+	<rosparam command="load" file="$(find robosense_ac_perception)/config/usr_config.yaml" />
+
+	<node pkg="robosense_ac_perception" type="yolov8_node" name="yolov8_node" output="screen" args="--config $(find robosense_ac_perception)/config/usr_config.yaml" cwd="node">
+		<rosparam file="$(find robosense_ac_perception)/config/usr_config.yaml" />
+	</node>
+	<node pkg="robosense_ac_perception" type="pv_post_process_node" name="pv_post_process_node" output="screen" args="--config $(find robosense_ac_perception)/config/usr_config.yaml" cwd="node">
+		<rosparam file="$(find robosense_ac_perception)/config/usr_config.yaml" />
+	</node>
+	<group if="$(arg rviz)">
+		<node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find robosense_ac_perception)/rviz_config/rviz_config_yolov8.rviz" />
+	</group>
+</launch>
+
