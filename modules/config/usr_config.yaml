@@ -6,7 +6,9 @@ yolov8_node:
     strategy: Yolov8DetNN
     Yolov8DetNN:
       sub_image_topic: /rs_camera/rgb
-      arm_model: "modules/config/deepmodel/Yolov8/yolov8n.rknn"
+      arm_hbdnn_model: "modules/config/deepmodel/Yolov8/yolov8n.bin"
+      arm_rknn_model: "modules/config/deepmodel/Yolov8/yolov8n.rknn"
+      arm_trt_model: "modules/config/deepmodel/Yolov8/yolov8n_arm.trt"
       x86_model: "modules/config/deepmodel/Yolov8/yolov8n.trt"
       nms_threshold: 0.45
       box_conf_threshold: 0.5
@@ -34,7 +36,9 @@ ppseg_node:
     PPSegNN:
       sub_image_topic: /rs_camera/rgb
       calib_file: "modules/config/calibration.yaml"
-      arm_model: "modules/config/deepmodel/PPSeg/ppseg_fp16.rknn"
+      arm_hbdnn_model: "modules/config/deepmodel/PPSeg/ppseg_1024_1792_nv12.bin"
+      arm_rknn_model: "modules/config/deepmodel/PPSeg/ppseg_fp16.rknn"
+      arm_trt_model: "modules/config/deepmodel/PPSeg/ppseg_arm_fp16.trt"
       x86_model: "modules/config/deepmodel/PPSeg/ppseg_fp16.trt"
       nn_input_width: 1792
       nn_input_height: 1024
@@ -50,12 +54,14 @@ promptda_node:
     PromptDANN:
       sub_image_topic: /rs_camera/rgb
       calib_file: "modules/config/calibration.yaml"
-      arm_model_s1: "modules/config/deepmodel/PromptDA/promptda_lidar.rknn"
-      arm_model_s2: "modules/config/deepmodel/PromptDA/promptda_image.rknn"
-      x86_model: "modules/config/deepmodel/PromptDA/promptda_fp16.trt"
+      arm_rknn_model_s1: "modules/config/deepmodel/PromptDA/promptda_lidar.rknn"
+      arm_rknn_model_s2: "modules/config/deepmodel/PromptDA/promptda_image.rknn"
+      arm_hbdnn_model: "modules/config/deepmodel/PromptDA/promptda.bin"
+      arm_trt_model: "modules/config/deepmodel/PromptDA/promptda_big_arm_fp16.trt"
+      x86_model: "modules/config/deepmodel/PromptDA/promptda_vits_big_fp16.trt"
       nn_input_width: 952
       nn_input_height: 420
       core: 0
-      clip_min: 2.1
-      clip_max: 3.8
+      clip_min: 0
+      clip_max: 20
       save_img: false

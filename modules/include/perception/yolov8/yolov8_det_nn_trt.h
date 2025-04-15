@@ -32,7 +32,7 @@ public:
   Yolov8DetNN() {
     params_ptr_ = std::make_shared<Yolov8DetParams>();
   }
-
+  ~Yolov8DetNN() {}
   void Init(const YAML::Node& cfg_node);
   bool LoadEngine(const std::string& engineFile);
   std::shared_ptr<cv::Mat> PreProcess(const Image &image);
@@ -53,6 +53,7 @@ private:
   Yolov8DetParams::Ptr params_ptr_;
 
   TrtLogger trt_logger_;
+  std::unique_ptr<nvinfer1::IRuntime> runtime_;
   std::shared_ptr<nvinfer1::ICudaEngine> engine_;
   std::shared_ptr<nvinfer1::IExecutionContext> context_;
   cudaStream_t stream_;

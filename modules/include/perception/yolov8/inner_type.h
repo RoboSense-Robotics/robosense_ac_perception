@@ -25,7 +25,7 @@ namespace perception {
 #define OBJ_NAME_MAX_SIZE_IN 64
 #define OBJ_CLASS_NUM_IN 80
 constexpr int OBJ_NUMB_MAX_SIZE_IN = 128;
-
+constexpr int REG = 16;
 enum class image_format_t{
     IMAGE_FORMAT_GRAY8,
     IMAGE_FORMAT_RGB888,

@@ -1,7 +1,7 @@
 #!/bin/bash
 MODEL_URL="https://cdn.robosense.cn/AC_wiki/deepmodel.zip"
 SAVE_PATH="modules/config"
-EXPECTED_MD5="110fbb7322786f116b60b6e490b363e5"
+EXPECTED_MD5="4d627b60e54d820c81aa040c621bb87f"
 
 mkdir -p "$(dirname "$SAVE_PATH")"
 

@@ -43,8 +43,8 @@ bool Yolov8DetNN::LoadEngine(const std::string& engineFile) {
   file.read(buffer.data(), fileSize);
   file.close();
 
-  auto runtime = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(trt_logger_));
-  engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(buffer.data(), fileSize));
+  runtime_ = std::unique_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(trt_logger_));
+  engine_ = std::shared_ptr<nvinfer1::ICudaEngine>(runtime_->deserializeCudaEngine(buffer.data(), fileSize));
 
   if (!engine_) {
       return false;
@@ -80,7 +80,7 @@ void Yolov8DetNN::InitMem() {
   const auto &config_ptr = params_ptr_->config_ptr_;
   const auto &infer_msg = params_ptr_->msg_ptr_;
   const auto &model_attr = params_ptr_->model_attr_ptr_;
-  model_attr->is_quant = false; // tensorrt 模型为fp32模型
+  model_attr->is_quant = false; // tensorrt 模型为fp16模型
   auto num_io_tensors = engine_->getNbIOTensors();
   int num_input = 0;
   int num_output = 0;
@@ -93,7 +93,7 @@ void Yolov8DetNN::InitMem() {
       num_output ++;
     }
   }
-  infer_msg->inputs.resize(num_input);
+  infer_msg->gpu_inputs.resize(num_input);
   model_attr->n_output = num_output;
   infer_msg->gpu_outputs.resize(num_output);
   infer_msg->nn_outputs.resize(num_output);
@@ -107,9 +107,10 @@ void Yolov8DetNN::InitMem() {
       for (auto j=0; j<dims.nbDims; j++) {
         size *= dims.d[j];
       }
+      DumpTensorAttr(name, dims, data_size);
       CheckNNAttr(dims);
-      BASE_CUDA_CHECK(cudaMalloc(&infer_msg->inputs[i], size));
-      context_->setTensorAddress(name, infer_msg->inputs[i]);
+      BASE_CUDA_CHECK(cudaMalloc(&infer_msg->gpu_inputs[i], size));
+      context_->setTensorAddress(name, infer_msg->gpu_inputs[i]);
     } else {
       auto dims = context_->getTensorShape(name);
       auto data_size = dataTypeSize(engine_->getTensorDataType(name));
@@ -120,6 +121,7 @@ void Yolov8DetNN::InitMem() {
         out_tensor_attr.setDims(j, dims.d[j]);
         out_tensor_attr.setSize(size);
       }
+      DumpTensorAttr(name, dims, data_size);
       model_attr->output_attrs.push_back(out_tensor_attr);
       int output_index = i - num_input;
       infer_msg->nn_outputs[output_index] = malloc(size);
@@ -170,7 +172,7 @@ void Yolov8DetNN::Perception(const DetectionMsg::Ptr &msg_ptr) {
     preprocess_time_record_.toc();
 
     infer_time_record_.tic();
-    BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->inputs[0], input_ptr->data,
+    BASE_CUDA_CHECK(cudaMemcpyAsync(infer_msg->gpu_inputs[0], input_ptr->data,
       input_ptr->total() * sizeof(float), cudaMemcpyHostToDevice, stream_));
     if(!context_->enqueueV3(stream_)) {
       std::cout << "Failed to forward." << std::endl;
@@ -185,11 +187,10 @@ void Yolov8DetNN::Perception(const DetectionMsg::Ptr &msg_ptr) {
 
     postprocess_time_record_.tic();
     PostProcess();
-    postprocess_time_record_.toc();
-
     // save
     DrawImg(msg_ptr, msg_ptr->input_msg_ptr->camera_data_map.at(topic), params_ptr_->msg_ptr_->od_results);
     DetectResultToObjectInner(params_ptr_->msg_ptr_->od_results,msg_ptr->input_msg_ptr->camera_data_map.at(topic).timestamp, msg_ptr->output_msg_ptr->object_list_ptr);
+    postprocess_time_record_.toc();
 }
 
 void Yolov8DetNN::PostProcess() {

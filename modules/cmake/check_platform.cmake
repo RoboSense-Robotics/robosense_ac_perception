@@ -15,12 +15,13 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|AMD64")
         message(STATUS "INFER WITH TENSORRT")
     endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+    message(STATUS "Target platform is ARM")
+    #RKNN
     execute_process(
     COMMAND bash -c "cat /proc/cpuinfo | grep 'Rockchip RK3588' | uniq | cut -d ':' -f 2"
     OUTPUT_VARIABLE CPU_MODEL
     OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-    message(STATUS "Target platform is ARM")
     if(CPU_MODEL STREQUAL " Rockchip RK3588")
         message(STATUS "Detected RK3588 chip")
         add_definitions(-DRK3588)
@@ -38,6 +39,25 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
                 set (TARGET_LIB_ARCH ${TARGET_LIB_ARCH}_uclibc)
             endif()
         endif()
+    endif()
+    #RDK X5
+    execute_process(
+    COMMAND bash -c "cat /proc/device-tree/model | grep -a 'D-Robotics RDK X5' | uniq | cut -d 'V' -f 1"
+    OUTPUT_VARIABLE BOARD_PLATFORM
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if (BOARD_PLATFORM STREQUAL "D-Robotics RDK X5")
+        option(INFER_HBDNN "USE HBDNN" ON)
+    endif()
+
+    # Jetson Orin Nano
+    execute_process(
+    COMMAND bash -c "cat /proc/device-tree/model | grep -a 'NVIDIA Jetson Orin Nano' | uniq | cut -d ' ' -f 1-4"
+    OUTPUT_VARIABLE BOARD_PLATFORM
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if (BOARD_PLATFORM STREQUAL "NVIDIA Jetson Orin Nano")
+        option(INFER_TENSORRT "USE TENSORRT" ON)
     endif()
 else()
     message(STATUS "Unknown platform: ${CMAKE_SYSTEM_PROCESSOR}")

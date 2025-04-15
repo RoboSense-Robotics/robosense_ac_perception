@@ -322,6 +322,7 @@ int post_process(Yolov8DetParams::Ptr params_ptr, std::vector<void*> outputs, Le
     // no object detect
     if (validCount <= 0)
     {
+        od_results->count = 0;
         return 0;
     }
     std::vector<int> indexArray;
@@ -367,6 +368,252 @@ int post_process(Yolov8DetParams::Ptr params_ptr, std::vector<void*> outputs, Le
     }
     od_results->count = last_count;
     return 0;
+}
+
+void post_process_scale_1(Yolov8DetParams::Ptr params_ptr, std::vector<std::vector<cv::Rect2d>>& bboxes, std::vector<std::vector<float>>& scores) {
+  float CONF_THRES_RAW_ = -log(1 / params_ptr->config_ptr_->box_conf_threshold - 1);     // 利用反函数作用阈值，利用单调性筛选
+  // 7.1.3 将BPU推理完的内存地址转换为对应类型的指针
+  auto *s_bbox_raw = reinterpret_cast<int32_t *>(params_ptr->msg_ptr_->nn_outputs[0]);
+  auto s_bbox_scale = reinterpret_cast<float*>(params_ptr->model_attr_ptr_->output_attrs[0].scale_pointer);
+  auto *s_cls_raw = reinterpret_cast<float *>(params_ptr->msg_ptr_->nn_outputs[3]);
+  int H_8 = 640 / 8;
+  int W_8 = 640 / 8;
+  for (int h = 0; h < H_8; h++) {
+    for (int w = 0; w < W_8; w++) {
+      // 7.1.4 取对应H和W位置的C通道, 记为数组的形式
+      // cls对应OBJ_CLASS_NUM_IN个分数RAW值, 也就是Sigmoid计算之前的值，这里利用函数单调性先筛选, 再计算
+      // bbox对应4个坐标乘以REG的RAW值, 也就是DFL计算之前的值, 仅仅分数合格了, 才会进行这部分的计算
+      float *cur_s_cls_raw = s_cls_raw;
+      int32_t *cur_s_bbox_raw = s_bbox_raw;
+      s_cls_raw += OBJ_CLASS_NUM_IN;
+      s_bbox_raw += REG * 4;
+
+      // 7.1.5 找到分数的最大值索引, 如果最大值小于阈值，则舍去
+      int cls_id = 0;
+      for (int i = 1; i < OBJ_CLASS_NUM_IN; i++) {
+        if (cur_s_cls_raw[i] > cur_s_cls_raw[cls_id]) {
+          cls_id = i;
+        }
+      }
+
+      // 7.1.6 不合格则直接跳过, 避免无用的反量化, DFL和dist2bbox计算
+      if (cur_s_cls_raw[cls_id] < CONF_THRES_RAW_) {
+          continue;
+      }
+
+      // 7.1.7 计算这个目标的分数
+      float score = 1 / (1 + std::exp(-cur_s_cls_raw[cls_id]));
+
+      // 7.1.8 对bbox_raw信息进行反量化, DFL计算
+      float ltrb[4], sum, dfl;
+      for (int i = 0; i < 4; i++) {
+        ltrb[i] = 0.;
+        sum = 0.;
+        for (int j = 0; j < REG; j++) {
+          dfl = std::exp(float(cur_s_bbox_raw[REG * i + j]) * s_bbox_scale[j]);
+          ltrb[i] += dfl * j;
+          sum += dfl;
+        }
+        ltrb[i] /= sum;
+      }
+
+      // 7.1.9 剔除不合格的框   if(x1 >= x2 || y1 >=y2) continue;
+      if (ltrb[2] + ltrb[0] <= 0 || ltrb[3] + ltrb[1] <= 0) {
+          continue;
+      }
+
+      // 7.1.10 dist 2 bbox (ltrb 2 xyxy)
+      float x1 = (w + 0.5 - ltrb[0]) * 8.0;
+      float y1 = (h + 0.5 - ltrb[1]) * 8.0;
+      float x2 = (w + 0.5 + ltrb[2]) * 8.0;
+      float y2 = (h + 0.5 + ltrb[3]) * 8.0;
+      // 7.1.11 对应类别加入到对应的std::vector中
+      bboxes[cls_id].push_back(cv::Rect2d(x1, y1, x2 - x1, y2 - y1));
+      scores[cls_id].push_back(score);
+      }
+    }
+}
+
+void post_process_scale_2(Yolov8DetParams::Ptr params_ptr, std::vector<std::vector<cv::Rect2d>>& bboxes, std::vector<std::vector<float>>& scores) {
+  float CONF_THRES_RAW_ = -log(1 / params_ptr->config_ptr_->box_conf_threshold - 1);     // 利用反函数作用阈值，利用单调性筛选
+  // 7.2.3 将BPU推理完的内存地址转换为对应类型的指针
+  auto *m_bbox_raw = reinterpret_cast<int32_t *>(params_ptr->msg_ptr_->nn_outputs[1]);
+  auto m_bbox_scale = reinterpret_cast<float*>(params_ptr->model_attr_ptr_->output_attrs[1].scale_pointer);
+  auto *m_cls_raw = reinterpret_cast<float *>(params_ptr->msg_ptr_->nn_outputs[4]);
+  int H_16 = 640 / 16;
+  int W_16 = 640 / 16;
+  for (int h = 0; h < H_16; h++) {
+    for (int w = 0; w < W_16; w++) {
+      // 7.2.4 取对应H和W位置的C通道, 记为数组的形式
+      // cls对应OBJ_CLASS_NUM_IN个分数RAW值, 也就是Sigmoid计算之前的值，这里利用函数单调性先筛选, 再计算
+      // bbox对应4个坐标乘以REG的RAW值, 也就是DFL计算之前的值, 仅仅分数合格了, 才会进行这部分的计算
+      float *cur_m_cls_raw = m_cls_raw;
+      int32_t *cur_m_bbox_raw = m_bbox_raw;
+      m_cls_raw += OBJ_CLASS_NUM_IN;
+      m_bbox_raw += REG * 4;
+
+      // 7.2.5 找到分数的最大值索引, 如果最大值小于阈值，则舍去
+      int cls_id = 0;
+      for (int i = 1; i < OBJ_CLASS_NUM_IN; i++) {
+        if (cur_m_cls_raw[i] > cur_m_cls_raw[cls_id]) {
+          cls_id = i;
+        }
+      }
+      // 7.2.6 不合格则直接跳过, 避免无用的反量化, DFL和dist2bbox计算
+      if (cur_m_cls_raw[cls_id] < CONF_THRES_RAW_)
+        continue;
+
+      // 7.2.7 计算这个目标的分数
+      float score = 1 / (1 + std::exp(-cur_m_cls_raw[cls_id]));
+
+      // 7.2.8 对bbox_raw信息进行反量化, DFL计算
+      float ltrb[4], sum, dfl;
+      for (int i = 0; i < 4; i++) {
+        ltrb[i] = 0.;
+        sum = 0.;
+        for (int j = 0; j < REG; j++)
+        {
+            dfl = std::exp(float(cur_m_bbox_raw[REG * i + j]) * m_bbox_scale[j]);
+            ltrb[i] += dfl * j;
+            sum += dfl;
+        }
+        ltrb[i] /= sum;
+      }
+
+      // 7.2.9 剔除不合格的框   if(x1 >= x2 || y1 >=y2) continue;
+      if (ltrb[2] + ltrb[0] <= 0 || ltrb[3] + ltrb[1] <= 0) {
+          continue;
+      }
+
+      // 7.2.10 dist 2 bbox (ltrb 2 xyxy)
+      float x1 = (w + 0.5 - ltrb[0]) * 16.0;
+      float y1 = (h + 0.5 - ltrb[1]) * 16.0;
+      float x2 = (w + 0.5 + ltrb[2]) * 16.0;
+      float y2 = (h + 0.5 + ltrb[3]) * 16.0;
+      // 7.2.11 对应类别加入到对应的std::vector中
+      bboxes[cls_id].push_back(cv::Rect2d(x1, y1, x2 - x1, y2 - y1));
+      scores[cls_id].push_back(score);
+    }
+  }
+}
+
+void post_process_scale_3(Yolov8DetParams::Ptr params_ptr, std::vector<std::vector<cv::Rect2d>>& bboxes, std::vector<std::vector<float>>& scores) {
+  // 7.3.3 将BPU推理完的内存地址转换为对应类型的指针
+  float CONF_THRES_RAW_ = -log(1 / params_ptr->config_ptr_->box_conf_threshold - 1);     // 利用反函数作用阈值，利用单调性筛选
+  auto *l_bbox_raw = reinterpret_cast<int32_t *>(params_ptr->msg_ptr_->nn_outputs[2]);
+  auto l_bbox_scale = reinterpret_cast<float*>(params_ptr->model_attr_ptr_->output_attrs[2].scale_pointer);
+  auto *l_cls_raw = reinterpret_cast<float *>(params_ptr->msg_ptr_->nn_outputs[5]);
+  int H_32 = 640 / 32;
+  int W_32 = 640 / 32;
+  for (int h = 0; h < H_32; h++) {
+    for (int w = 0; w < W_32; w++) {
+      // 7.3.4 取对应H和W位置的C通道, 记为数组的形式
+      // cls对应OBJ_CLASS_NUM_IN个分数RAW值, 也就是Sigmoid计算之前的值，这里利用函数单调性先筛选, 再计算
+      // bbox对应4个坐标乘以REG的RAW值, 也就是DFL计算之前的值, 仅仅分数合格了, 才会进行这部分的计算
+      float *cur_l_cls_raw = l_cls_raw;
+      int32_t *cur_l_bbox_raw = l_bbox_raw;
+      l_cls_raw += OBJ_CLASS_NUM_IN;
+      l_bbox_raw += REG * 4;
+
+      // 7.3.5 找到分数的最大值索引, 如果最大值小于阈值，则舍去
+      int cls_id = 0;
+      for (int i = 1; i < OBJ_CLASS_NUM_IN; i++) {
+        if (cur_l_cls_raw[i] > cur_l_cls_raw[cls_id]) {
+          cls_id = i;
+        }
+      }
+
+      // 7.3.6 不合格则直接跳过, 避免无用的反量化, DFL和dist2bbox计算
+      if (cur_l_cls_raw[cls_id] < CONF_THRES_RAW_)
+          continue;
+
+      // 7.3.7 计算这个目标的分数
+      float score = 1 / (1 + std::exp(-cur_l_cls_raw[cls_id]));
+
+      // 7.3.8 对bbox_raw信息进行反量化, DFL计算
+      float ltrb[4], sum, dfl;
+      for (int i = 0; i < 4; i++) {
+        ltrb[i] = 0.;
+        sum = 0.;
+        for (int j = 0; j < REG; j++) {
+          dfl = std::exp(float(cur_l_bbox_raw[REG * i + j]) * l_bbox_scale[j]);
+          ltrb[i] += dfl * j;
+          sum += dfl;
+        }
+        ltrb[i] /= sum;
+      }
+
+      // 7.3.9 剔除不合格的框   if(x1 >= x2 || y1 >=y2) continue;
+      if (ltrb[2] + ltrb[0] <= 0 || ltrb[3] + ltrb[1] <= 0) {
+          continue;
+      }
+
+      // 7.3.10 dist 2 bbox (ltrb 2 xyxy)
+      float x1 = (w + 0.5 - ltrb[0]) * 32.0;
+      float y1 = (h + 0.5 - ltrb[1]) * 32.0;
+      float x2 = (w + 0.5 + ltrb[2]) * 32.0;
+      float y2 = (h + 0.5 + ltrb[3]) * 32.0;
+      // 7.3.11 对应类别加入到对应的std::vector中
+      bboxes[cls_id].push_back(cv::Rect2d(x1, y1, x2 - x1, y2 - y1));
+      scores[cls_id].push_back(score);
+    }
+  }
+}
+
+void nmsAndDecode(Yolov8DetParams::Ptr params_ptr, const std::vector<std::vector<cv::Rect2d>>& bboxes, const std::vector<std::vector<float>>& scores, const LetterBoxInfo& letter_box) {
+  // 7.4 对每一个类别进行NMS
+  std::vector<std::vector<int>> indices(OBJ_CLASS_NUM_IN);
+  for (int i = 0; i < OBJ_CLASS_NUM_IN; i++) {
+    cv::dnn::NMSBoxes(bboxes[i], scores[i], params_ptr->config_ptr_->box_conf_threshold,
+      params_ptr->config_ptr_->nms_threshold, indices[i], 1.f, 300);
+  }
+  //decode
+  std::vector<DetObject> det_objs;
+  for (int i = 0; i < OBJ_CLASS_NUM_IN; i++) {
+    // 8.1 每一个类别分别渲染
+    for (auto iter = indices[i].begin(); iter != indices[i].end(); ++iter) {
+      // 8.2 获取基本的 bbox 信息
+      DetObject det_obj;
+      det_obj.box.left = int((bboxes[i][*iter].x - letter_box.x_pad) / letter_box.scale);
+      det_obj.box.top = int((bboxes[i][*iter].y - letter_box.y_pad) / letter_box.scale);
+      auto width = bboxes[i][*iter].width / letter_box.scale;
+      det_obj.box.right = int(det_obj.box.left + width);
+      auto height = bboxes[i][*iter].height / letter_box.scale;
+      det_obj.box.bottom = int(det_obj.box.top + height);
+      det_obj.cls_id = i;
+      det_obj.prop = scores[i][*iter];
+      det_objs.emplace_back(det_obj);
+    }
+  }
+  // 类间nms
+  std::vector<cv::Rect2d> temp_bboxes;
+  std::vector<float> temp_scores;
+  std::vector<int> index;
+  for (size_t i=0; i<det_objs.size(); i++) {
+    temp_bboxes.emplace_back(cv::Rect2d(det_objs[i].box.left,
+                                        det_objs[i].box.top,
+                                        det_objs[i].box.right - det_objs[i].box.left,
+                                        det_objs[i].box.bottom - det_objs[i].box.top));
+    temp_scores.emplace_back(det_objs[i].prop);
+  }
+  cv::dnn::NMSBoxes(temp_bboxes, temp_scores, params_ptr->config_ptr_->box_conf_threshold,
+                0.7, index, 1.f, 300);
+  for (auto idx : index) {
+    params_ptr->msg_ptr_->od_results.results.emplace_back(det_objs[idx]);
+  }
+}
+
+void post_process_hbdnn(Yolov8DetParams::Ptr params_ptr) {
+  params_ptr->msg_ptr_->od_results.results.clear();
+
+  std::vector<std::vector<cv::Rect2d>> bboxes(OBJ_CLASS_NUM_IN); // 每个id的xyhw 信息使用一个std::vector<cv::Rect2d>存储
+  std::vector<std::vector<float>> scores(OBJ_CLASS_NUM_IN);      // 每个id的score信息使用一个std::vector<float>存储
+
+  post_process_scale_1(params_ptr, bboxes, scores);
+  post_process_scale_2(params_ptr, bboxes, scores);
+  post_process_scale_3(params_ptr, bboxes, scores);
+  nmsAndDecode(params_ptr, bboxes, scores, params_ptr->msg_ptr_->lb);
+  params_ptr->msg_ptr_->od_results.count = params_ptr->msg_ptr_->od_results.results.size();
 }
 
 } // namespace robosense

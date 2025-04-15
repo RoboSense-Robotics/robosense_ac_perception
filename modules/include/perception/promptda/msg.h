@@ -39,12 +39,18 @@ public:
       cudaFree(x);
     }
 #endif
+#ifdef ENABLE_RKNN
     for (auto x : inputs) {
-      free(x);
+      if (x != nullptr) {
+        free(x);
+      }
     }
     for (auto& x : nn_outputs) {
-      free(x);
+      if (x != nullptr) {
+        free(x);
+      }
     }
+#endif
   }
 #ifdef ENABLE_TENSORRT
   std::vector<void*> gpu_inputs;

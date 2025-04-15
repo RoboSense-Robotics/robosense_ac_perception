@@ -18,20 +18,22 @@ limitations under the License.
 
 #include<vector>
 #include<cassert>
-constexpr size_t RKNN_MAX_DIMS_IN = 16;
+constexpr size_t MAX_DIMS_IN = 16;
 struct TensorAttr {
     TensorAttr() {
-        dims.resize(RKNN_MAX_DIMS_IN);
+        dims.resize(MAX_DIMS_IN);
     }
     TensorAttr(uint32_t n) : n_dims(n), zp(0), scale(1.0) {
-      dims.resize(RKNN_MAX_DIMS_IN);
+      dims.resize(MAX_DIMS_IN);
   }
     TensorAttr(uint32_t n, int32_t zp_, float scale_) : n_dims(n), zp(zp_), scale(scale_) {
-        dims.resize(RKNN_MAX_DIMS_IN);
+        dims.resize(MAX_DIMS_IN);
     }
 
+    TensorAttr(float* scale_point) : scale_pointer(scale_point) {}
+
     void setDims(uint32_t index, uint32_t num) {
-      assert(index < RKNN_MAX_DIMS_IN);
+      assert(index < MAX_DIMS_IN);
       dims[index] = num;
     }
 
@@ -46,6 +48,7 @@ struct TensorAttr {
     uint32_t data_size;
     int32_t zp;
     float scale;
+    float* scale_pointer;
 };
 
 #endif // PERCEPTION_COMMON_UTILS_H_

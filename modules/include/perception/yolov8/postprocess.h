@@ -25,7 +25,7 @@ namespace robosense {
 namespace perception {
 
 int post_process(Yolov8DetParams::Ptr params_ptr, std::vector<void*> outputs, LetterBoxInfo *letter_box, ObjectList *od_results);
-
+void post_process_hbdnn(Yolov8DetParams::Ptr params_ptr);
 } // namespace robosense
 } // namespace perception
 #endif // PERCEPTION_YOLOV8_POSTPROCESS_H

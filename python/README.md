@@ -7,19 +7,19 @@ https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-853/install-guid
 ### yolov8n
 
 ```shell
-cd super_sensor_sdk_ros2/perception
+cd robosense_ac_studio/robosense_ac_perception
 python3 python/convert.py --model_path modules/config/deepmodel/Yolov8/yolov8n.onnx --output_path yolov8n.trt --model_type trt
 ```
 ### ppseg
 
 ```shell
-cd super_sensor_sdk_ros2/perception
-python3 python/convert.py --model_path modules/config/deepmodel/PPSeg/pp_liteseg_cityscapes.onnx --output_path ppseg.trt --model_type trt
+cd robosense_ac_studio/robosense_ac_perception
+python3 python/convert.py --model_path modules/config/deepmodel/PPSeg/ppseg_1024_1792.onnx --output_path ppseg.trt --model_type trt --fp16
 ```
 ### PromptDA
 ```shell
-cd super_sensor_sdk_ros2/perception
-python3 python/convert.py --model_path modules/config/deepmodel/PromptDA/Prompt_vits.onnx --output_path promptda.trt --model_type trt
+cd robosense_ac_studio/robosense_ac_perception
+python3 python/convert.py --model_path modules/config/deepmodel/PromptDA/promptda.onnx --output_path promptda.trt --model_type trt --fp16
 ```
 
 ## 转RKNN模型
@@ -29,30 +29,42 @@ RKNN的模型转换依赖 RKNN-Toolkit2, 依赖的安装请参考 https://github
 ### yolov8n
 
 ```shell
-cd super_sensor_sdk_ros2/perception
+cd robosense_ac_studio/robosense_ac_perception
 python3 python/convert.py --model_path modules/config/deepmodel/Yolov8/yolov8n.onnx --output_path yolov8n.rknn --model_type rknn --platform rk3588 --do_quant --dataset_path python/COCO/coco_subset_20.txt
 ```
 
 ### ppseg
 
 ```shell
-cd super_sensor_sdk_ros2/perception
-python3 python/convert.py --model_path modules/config/deepmodel/PPSeg/pp_liteseg_cityscapes.onnx  --output_path ppseg.rknn --model_type rknn --platform rk3588 --do_quant --dataset_path python/PPSeg/dataset.txt
+cd robosense_ac_studio/robosense_ac_perception
+python3 python/convert.py --model_path modules/config/deepmodel/PPSeg/ppseg_1024_1792.onnx  --output_path ppseg.rknn --model_type rknn --platform rk3588 --do_quant --dataset_path python/PPSeg/dataset.txt
 ```
 
 ### PromptDA
 
 ```shell
-cd super_sensor_sdk_ros2/perception
+cd robosense_ac_studio/robosense_ac_perception
 python3 python/convert.py --model_path modules/config/deepmodel/PromptDA/promptda_image.onnx  --output_path promptda_image.rknn --model_type rknn --platform rk3588
 python3 python/convert.py --model_path modules/config/deepmodel/PromptDA/promptda_lidar.onnx  --output_path promptda_lidar.rknn --model_type rknn --platform rk3588
+```
+## 转 RDK X5 模型
+参考[官方指南](https://developer.d-robotics.cc/rdk_doc/Advanced_development/toolchain_development/overview)进行模型转换
+### yolov8n
+
+参考[文档](https://github.com/D-Robotics/rdk_model_zoo/blob/main/demos/detect/YOLOv8/YOLOv8-Detect_YUV420SP/README_cn.md)
+
+### ppseg
+下载模型到 model 文件夹，进入 docker 容器下对应rdkx5_convert/ppseg_ws目录，执行以下命令
+```shell
+sh 02_preprocess.sh
+sh 03_build.sh
 ```
 
 ## 在 nvidia GPU 上离线跑模型
 离线跑语义分割或稠密深度估计模型，需要先将ros2文件转为python可以直接读取的pkl文件
 
 ```shell
-cd super_sensor_sdk_ros2/perception
+cd robosense_ac_studio/robosense_ac_perception
 python3 conver_ros2_to_pkl.py --ros2path ${ros2 path} --pklpath ${pkl path} --ros1path ${ros1 path} --calib ${calib yaml}
 ```
 语义分割 mask2former
