@@ -52,11 +52,11 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
 
     # Jetson Orin Nano
     execute_process(
-    COMMAND bash -c "cat /proc/device-tree/model | grep -a 'NVIDIA Jetson Orin Nano' | uniq | cut -d ' ' -f 1-4"
+    COMMAND bash -c "cat /proc/device-tree/model | grep -a 'NVIDIA Jetson' | uniq | cut -d ' ' -f 1-2"
     OUTPUT_VARIABLE BOARD_PLATFORM
     OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-    if (BOARD_PLATFORM STREQUAL "NVIDIA Jetson Orin Nano")
+    if (BOARD_PLATFORM STREQUAL "NVIDIA Jetson")
         option(INFER_TENSORRT "USE TENSORRT" ON)
     endif()
 else()

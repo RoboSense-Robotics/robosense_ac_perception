@@ -62,6 +62,6 @@ promptda_node:
       nn_input_width: 952
       nn_input_height: 420
       core: 0
-      clip_min: 0
-      clip_max: 20
+      clip_min: 2.1
+      clip_max: 3.8
       save_img: false
